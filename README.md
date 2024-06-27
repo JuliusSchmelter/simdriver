@@ -4,7 +4,7 @@
 ### Installation
 
 ```PowerShell
-cd simdriver/openfast_toolbox
+cd simdriver\openfast_toolbox
 python -m pip install -e .
 ```
 
