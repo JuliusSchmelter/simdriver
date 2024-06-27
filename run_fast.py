@@ -6,8 +6,22 @@ from itertools import batched
 import math
 from shutil import copytree, rmtree
 
-
 from openfast_toolbox.io import FASTInputFile, FASTOutputFile
+
+
+# Deduplicate Pandas column names.
+# https://stackoverflow.com/questions/40774787/renaming-columns-in-a-pandas-dataframe-with-duplicate-column-names
+class renamer:
+    def __init__(self):
+        self.d = dict()
+
+    def __call__(self, x):
+        if x not in self.d:
+            self.d[x] = 0
+            return x
+        else:
+            self.d[x] += 1
+            return "%s_%d" % (x, self.d[x])
 
 
 def run_fast(
@@ -177,7 +191,7 @@ def run_fast(
         output_file = FASTOutputFile(f"{output_dir}/{Path(inflow_file).stem}.outb")
 
         # Convert to parquet.
-        output_file.toDataFrame().to_parquet(
+        output_file.toDataFrame().rename(columns=renamer()).to_parquet(
             f"{output_dir}/{Path(inflow_file).stem}.parquet"
         )
 
