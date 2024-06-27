@@ -7,7 +7,7 @@ import math
 from shutil import copytree, rmtree
 
 
-from openfast_toolbox.io import FASTInputFile
+from openfast_toolbox.io import FASTInputFile, FASTOutputFile
 
 
 def run_fast(
@@ -170,6 +170,16 @@ def run_fast(
         for file in outfiles:
             print(f"########## {Path(file).stem} ##########\n")
             print(open(file, "r").read())
+
+    # Convert output to parquet.
+    for inflow_file in inflow_files:
+        # Load FAST output file.
+        output_file = FASTOutputFile(f"{output_dir}/{Path(inflow_file).stem}.outb")
+
+        # Convert to parquet.
+        output_file.toDataFrame().to_parquet(
+            f"{output_dir}/{Path(inflow_file).stem}.parquet"
+        )
 
     # Print completion message.
     print("\nOpenFAST simulation completed.\n")
