@@ -73,6 +73,9 @@ def run_fast(
         if not isinstance(steady_wind_speed, list):
             steady_wind_speed = [steady_wind_speed]
 
+        # Set wind input to steady wind.
+        inflow_file["WindType"] = 1
+
         # Configure steady wind inflow parameters.
         inflow_file["RefHt"] = steady_reference_height
         inflow_file["PLexp"] = steady_power_law_exponent
@@ -102,6 +105,9 @@ def run_fast(
                 raise ValueError("no wind input found.")
         else:
             bts_files = wind_files
+
+        # Set wind input to TurbSim.
+        inflow_file["WindType"] = 3
 
         # Loop over TurbSim files.
         for bts_file in bts_files:
