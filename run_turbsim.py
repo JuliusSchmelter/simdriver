@@ -14,8 +14,9 @@ def run_turbsim(
     grid_size_horizontal: float,
     grid_size_vertical: float,
     hub_height: float,
-    wind_speed: float | list[float],
+    wind_speed: float | list[float] | None = None,
     turbulence_intensity: str | float | list[float] = "A",
+    wind_and_ti: list[tuple[float, float]] | None = None,
     ref_height: float | None = None,
     time_span: int = 660,
     time_step: float = 0.05,
@@ -66,7 +67,10 @@ def run_turbsim(
 
     # Generate all possible combinations of input parameters.
     inp_files = []
-    for u, ti in product(wind_speed, turbulence_intensity):
+    if wind_and_ti is None:
+        wind_and_ti = list(product(wind_speed, turbulence_intensity))
+
+    for u, ti in wind_and_ti:
         # Apply user-defined seed or generate random seed.
         if rand_seed is None:
             file["RandSeed1"] = random.randint(-2147483648, 2147483647)
