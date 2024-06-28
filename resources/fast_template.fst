@@ -15,7 +15,7 @@ True          Echo            - Echo input data to <RootName>.ech (flag)
 2             CompAero        - Compute aerodynamic loads (switch) {0=None; 1=AeroDyn v14; 2=AeroDyn v15}
 1             CompServo       - Compute control and electrical-drive dynamics (switch) {0=None; 1=ServoDyn}
 0             CompHydro       - Compute hydrodynamic loads (switch) {0=None; 1=HydroDyn}
-2             CompSub         - Compute sub-structural dynamics (switch) {0=None; 1=SubDyn; 2=External Platform MCKF}
+0             CompSub         - Compute sub-structural dynamics (switch) {0=None; 1=SubDyn; 2=External Platform MCKF}
 0             CompMooring     - Compute mooring system (switch) {0=None; 1=MAP++; 2=FEAMooring; 3=MoorDyn; 4=OrcaFlex}
 0             CompIce         - Compute ice loads (switch) {0=None; 1=IceFloe; 2=IceDyn}
 0             MHK             - MHK turbine type (switch) {0=Not an MHK turbine; 1=Fixed MHK turbine; 2=Floating MHK turbine}
@@ -30,17 +30,17 @@ True          Echo            - Echo input data to <RootName>.ech (flag)
 0             WtrDpth         - Water depth (m)
 0             MSL2SWL         - Offset between still-water level and mean sea level (m) [positive upward]
 ---------------------- INPUT FILES ---------------------------------------------
-"-"	          EDFile          - Name of file containing ElastoDyn input parameters (quoted string)
-"-"           BDBldFile(1)    - Name of file containing BeamDyn input parameters for blade 1 (quoted string)
-"-"           BDBldFile(2)    - Name of file containing BeamDyn input parameters for blade 2 (quoted string)
-"-"           BDBldFile(3)    - Name of file containing BeamDyn input parameters for blade 3 (quoted string)
-"-"	          InflowFile      - Name of file containing inflow wind input parameters (quoted string)
-"-"	          AeroFile        - Name of file containing aerodynamic input parameters (quoted string)
-"-"	          ServoFile       - Name of file containing control and electrical-drive input parameters (quoted string)
-"-"           HydroFile       - Name of file containing hydrodynamic input parameters (quoted string)
-"-"           SubFile         - Name of file containing sub-structural input parameters (quoted string)
-"-"           MooringFile     - Name of file containing mooring system input parameters (quoted string)
-"-"           IceFile         - Name of file containing ice input parameters (quoted string)
+"unused"      EDFile          - Name of file containing ElastoDyn input parameters (quoted string)
+"unused"      BDBldFile(1)    - Name of file containing BeamDyn input parameters for blade 1 (quoted string)
+"unused"      BDBldFile(2)    - Name of file containing BeamDyn input parameters for blade 2 (quoted string)
+"unused"      BDBldFile(3)    - Name of file containing BeamDyn input parameters for blade 3 (quoted string)
+"unused"      InflowFile      - Name of file containing inflow wind input parameters (quoted string)
+"unused"      AeroFile        - Name of file containing aerodynamic input parameters (quoted string)
+"unused"      ServoFile       - Name of file containing control and electrical-drive input parameters (quoted string)
+"unused"      HydroFile       - Name of file containing hydrodynamic input parameters (quoted string)
+"unused"      SubFile         - Name of file containing sub-structural input parameters (quoted string)
+"unused"      MooringFile     - Name of file containing mooring system input parameters (quoted string)
+"unused"      IceFile         - Name of file containing ice input parameters (quoted string)
 ---------------------- OUTPUT --------------------------------------------------
 True          SumPrint        - Print summary data to "<RootName>.sum" (flag)
 5             SttsTime        - Amount of time between screen status messages (s)

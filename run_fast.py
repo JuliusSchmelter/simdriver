@@ -27,10 +27,12 @@ class renamer:
 def run_fast(
     output_dir: str,
     model_dir: str,
-    elastodyn: str,
     aerodyn: str,
     servodyn: str,
-    ext_ptfm: str,
+    elastodyn: str,
+    bladedyn: str | list[str] | None = None,
+    subdyn: str | None = None,
+    ext_ptfm: str | None = None,
     wind_files: str | list[str] | None = None,
     steady_wind_speed: float | list[float] | None = None,
     steady_power_law_exponent: float | None = None,
@@ -85,7 +87,7 @@ def run_fast(
             inflow_file["HWindSpeed"] = u
 
             # Write inflow file.
-            path = f"{os.getcwd()}/{output_dir}/U_{u}.dat"
+            path = f"{os.getcwd()}/{output_dir}/U_{u}_TI_0.dat"
             inflow_file.write(path)
             inflow_files.append(path)
 
@@ -157,9 +159,24 @@ def run_fast(
 
             # Set FAST input file parameters.
             file["EDFile"] = f'"{temp_dir}/{elastodyn}"'
+
+            if bladedyn is not None:
+                if not isinstance(bladedyn, list):
+                    bladedyn = [bladedyn] * 3
+
+                for i, blade in enumerate(bladedyn):
+                    file[f"BDBldFile({i+1})"] = f'"{temp_dir}/{blade}"'
+
             file["AeroFile"] = f'"{temp_dir}/{aerodyn}"'
             file["ServoFile"] = f'"{temp_dir}/{servodyn}"'
-            file["SubFile"] = f'"{temp_dir}/{ext_ptfm}"'
+
+            if subdyn is not None:
+                file["CompSub"] = 1
+                file["SubFile"] = f'"{temp_dir}/{subdyn}"'
+
+            if ext_ptfm is not None:
+                file["CompSub"] = 2
+                file["SubFile"] = f'"{temp_dir}/{ext_ptfm}"'
 
             file["InflowFile"] = f'"{inflow_file}"'
 

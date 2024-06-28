@@ -18,7 +18,7 @@ def run_turbsim(
     turbulence_intensity: str | float | list[float] = "A",
     ref_height: float | None = None,
     time_span: int = 660,
-    time_step: float = 0.25,
+    time_step: float = 0.05,
     rand_seed: int | None = None,
     # Float or None to use default value.
     power_law_exponent: float | None = None,
