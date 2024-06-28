@@ -216,8 +216,8 @@ def run_fast(
             task.wait()
 
         # Clean up temporary directories.
-        # for temp_dir in temp_dirs:
-        #     rmtree(temp_dir)
+        for temp_dir in temp_dirs:
+            rmtree(temp_dir)
 
         # Print stdout and stderr.
         for fst_file in outfiles:
