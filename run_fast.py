@@ -8,20 +8,16 @@ from shutil import copytree, rmtree
 
 from openfast_toolbox.io import FASTInputFile, FASTOutputFile
 
-
-# Deduplicate Pandas column names.
-# https://stackoverflow.com/questions/40774787/renaming-columns-in-a-pandas-dataframe-with-duplicate-column-names
-class renamer:
-    def __init__(self):
-        self.d = dict()
-
-    def __call__(self, x):
-        if x not in self.d:
-            self.d[x] = 0
-            return x
-        else:
-            self.d[x] += 1
-            return "%s_%d" % (x, self.d[x])
+DEFAULT_ELASTODYN_OUT = ["RotSpeed", "BldPitch1"]
+DEFAULT_SERVODYN_OUT = ["GenPwr", "GenTq"]
+RENAME = {
+    "Time_[s]": "time",
+    "Wind1VelX_[m/s]": "v0",
+    "RotSpeed_[rpm]": "rot_speed",
+    "BldPitch1_[deg]": "pitch",
+    "GenPwr_[kW]": "gen_power",
+    "GenTq_[kN-m]": "gen_torque",
+}
 
 
 def run_fast(
@@ -30,15 +26,17 @@ def run_fast(
     aerodyn: str,
     servodyn: str,
     elastodyn: str,
-    bladedyn: str | list[str] | None = None,
+    beamdyn_blade: str | list[str] | None = None,
     subdyn: str | None = None,
     ext_ptfm: str | None = None,
     wind_files: str | list[str] | None = None,
     steady_wind_speed: float | list[float] | None = None,
-    steady_power_law_exponent: float | None = None,
+    steady_power_law_exponent: float = 0.2,
     steady_reference_height: float | None = None,
     time_span: float = 660,
     time_step: float = 0.01,
+    elastodyn_out: list[str] = [],
+    servodyn_out: list[str] = [],
     custom_fast: str | None = None,
     fast_version: str = "3.5",
     max_processes: int = 32,
@@ -46,31 +44,40 @@ def run_fast(
     # Path to resource directory.
     resources = Path(__file__).parent / "resources"
 
+    # Path to FAST executable.
+    if custom_fast is not None:
+        fast_exe = f"{os.getcwd()}/{custom_fast}"
+    else:
+        fast_exe = resources / "OpenFAST.exe"
+
     # Create output directory if it does not exist.
     if not Path(output_dir).exists():
         Path(output_dir).mkdir(parents=True)
 
     # Load fast input file template.
-    file = FASTInputFile(resources / "fast_template.fst")
+    fst_file = FASTInputFile(resources / "fast_template.fst")
 
     # Apply scalar parameters.
-    file["TMax"] = time_span
-    file["DT"] = time_step
+    fst_file["TMax"] = time_span
+    fst_file["DT"] = time_step
 
+    ################################################################################################
+    # Prepare inflow.
     # Load inflow file template.
     inflow_file = FASTInputFile(
         f"{resources}/inflow_template_{fast_version.replace(".", "_")}.dat"
     )
 
+    # Set wind speed output at hub height.
+    elastodyn_file = FASTInputFile(f"{model_dir}/{elastodyn}")
+    hub_height = elastodyn_file["TowerHt"] + elastodyn_file["Twr2Shft"]
+    inflow_file["WindVziList"] = hub_height
+
     # Collect inflow files.
     inflow_files = []
 
     # Steady wind speed.
-    if (
-        steady_wind_speed is not None
-        and steady_power_law_exponent is not None
-        and steady_reference_height is not None
-    ):
+    if steady_wind_speed is not None:
         # Make sure steady_wind_speed is a list.
         if not isinstance(steady_wind_speed, list):
             steady_wind_speed = [steady_wind_speed]
@@ -79,6 +86,9 @@ def run_fast(
         inflow_file["WindType"] = 1
 
         # Configure steady wind inflow parameters.
+        if steady_reference_height is None:
+            steady_reference_height = hub_height
+
         inflow_file["RefHt"] = steady_reference_height
         inflow_file["PLexp"] = steady_power_law_exponent
 
@@ -92,11 +102,7 @@ def run_fast(
             inflow_files.append(path)
 
     # TurbSim wind input.
-    elif (
-        steady_wind_speed is None
-        and steady_power_law_exponent is None
-        and steady_reference_height is None
-    ):
+    elif steady_wind_speed is None:
         # Find TurbSim files.
         if not isinstance(wind_files, list):
             if wind_files is None:
@@ -125,12 +131,7 @@ def run_fast(
     else:
         raise ValueError("invalid combination of parameters.")
 
-    # Path to FAST executable.
-    if custom_fast is not None:
-        fast_exe = f"{os.getcwd()}/{custom_fast}"
-    else:
-        fast_exe = resources / "OpenFAST.exe"
-
+    ################################################################################################
     # Run FAST in parallel.
     # Iterate over inflow files in batches.
     counter = 1
@@ -158,31 +159,46 @@ def run_fast(
             copytree(model_dir, temp_dir)
 
             # Set FAST input file parameters.
-            file["EDFile"] = f'"{temp_dir}/{elastodyn}"'
+            # ElastoDyn.
+            elastodyn_path = f"{temp_dir}/{elastodyn}"
+            fst_file["EDFile"] = f'"{elastodyn_path}"'
+            elastodyn_file = FASTInputFile(elastodyn_path)
+            elastodyn_file["OutList"] = [""] + DEFAULT_ELASTODYN_OUT + elastodyn_out
+            elastodyn_file.write(elastodyn_path)
 
-            if bladedyn is not None:
-                if not isinstance(bladedyn, list):
-                    bladedyn = [bladedyn] * 3
+            # BeamDyn.
+            if beamdyn_blade is not None:
+                if not isinstance(beamdyn_blade, list):
+                    beamdyn_blade = [beamdyn_blade] * 3
 
-                for i, blade in enumerate(bladedyn):
-                    file[f"BDBldFile({i+1})"] = f'"{temp_dir}/{blade}"'
+                for i, blade in enumerate(beamdyn_blade):
+                    fst_file[f"BDBldFile({i+1})"] = f'"{temp_dir}/{blade}"'
 
-            file["AeroFile"] = f'"{temp_dir}/{aerodyn}"'
-            file["ServoFile"] = f'"{temp_dir}/{servodyn}"'
+            # AeroDyn.
+            fst_file["AeroFile"] = f'"{temp_dir}/{aerodyn}"'
 
+            # ServoDyn.
+            servodyn_path = f"{temp_dir}/{servodyn}"
+            fst_file["ServoFile"] = f'"{servodyn_path}"'
+            servodyn_file = FASTInputFile(servodyn_path)
+            servodyn_file["OutList"] = [""] + DEFAULT_SERVODYN_OUT + servodyn_out
+            servodyn_file.write(servodyn_path)
+
+            # SubDyn or ExtPtfm.
             if subdyn is not None:
-                file["CompSub"] = 1
-                file["SubFile"] = f'"{temp_dir}/{subdyn}"'
+                fst_file["CompSub"] = 1
+                fst_file["SubFile"] = f'"{temp_dir}/{subdyn}"'
 
             if ext_ptfm is not None:
-                file["CompSub"] = 2
-                file["SubFile"] = f'"{temp_dir}/{ext_ptfm}"'
+                fst_file["CompSub"] = 2
+                fst_file["SubFile"] = f'"{temp_dir}/{ext_ptfm}"'
 
-            file["InflowFile"] = f'"{inflow_file}"'
+            # InflowWind.
+            fst_file["InflowFile"] = f'"{inflow_file}"'
 
             # Write main fast input file.
             input_file = f"{output_dir}/{Path(inflow_file).stem}.fst"
-            file.write(input_file)
+            fst_file.write(input_file)
 
             # Run FAST.
             stdout = Path(input_file).with_suffix(".out")
@@ -200,21 +216,22 @@ def run_fast(
             task.wait()
 
         # Clean up temporary directories.
-        for temp_dir in temp_dirs:
-            rmtree(temp_dir)
+        # for temp_dir in temp_dirs:
+        #     rmtree(temp_dir)
 
         # Print stdout and stderr.
-        for file in outfiles:
-            print(f"########## {Path(file).stem} ##########\n")
-            print(open(file, "r").read())
+        for fst_file in outfiles:
+            print(f"########## {Path(fst_file).stem} ##########\n")
+            print(open(fst_file, "r").read())
 
-    # Convert output to parquet.
+    ################################################################################################
+    # Process output.
     for inflow_file in inflow_files:
         # Load FAST output file.
         output_file = FASTOutputFile(f"{output_dir}/{Path(inflow_file).stem}.outb")
 
         # Convert to parquet.
-        output_file.toDataFrame().rename(columns=renamer()).to_parquet(
+        output_file.toDataFrame().rename(columns=RENAME).to_parquet(
             f"{output_dir}/{Path(inflow_file).stem}.parquet"
         )
 

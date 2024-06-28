@@ -18,8 +18,8 @@ False         WrACT            - Output coherent turbulence time steps in AeroDy
 --------Turbine/Model Specifications-----------------------
 0             NumGrid_Z        - Vertical grid-point matrix dimension
 0             NumGrid_Y        - Horizontal grid-point matrix dimension
-0.25          TimeStep         - Time step [seconds]
-600           AnalysisTime     - Length of analysis time series [seconds] (program will add time if necessary: AnalysisTime = MAX(AnalysisTime, UsableTime+GridWidth/MeanHHWS) )
+0.05          TimeStep         - Time step [seconds]
+660           AnalysisTime     - Length of analysis time series [seconds] (program will add time if necessary: AnalysisTime = MAX(AnalysisTime, UsableTime+GridWidth/MeanHHWS) )
 "ALL"         UsableTime       - Usable length of output time series [seconds] (program will add GridWidth/MeanHHWS seconds unless UsableTime is "ALL")
 0             HubHt            - Hub height [m] (should be > 0.5*GridHeight)
 0             GridHeight       - Grid height [m]
