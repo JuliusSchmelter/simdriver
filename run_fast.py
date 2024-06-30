@@ -15,7 +15,7 @@ RENAME = {
     "Wind1VelX_[m/s]": "v0",
     "RotSpeed_[rpm]": "rot_speed",
     "BldPitch1_[deg]": "pitch",
-    "GenPwr_[kW]": "gen_power",
+    "GenPwr_[kW]": "power",
 }
 
 
