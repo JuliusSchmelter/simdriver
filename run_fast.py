@@ -9,14 +9,13 @@ from shutil import copytree, rmtree
 from openfast_toolbox.io import FASTInputFile, FASTOutputFile
 
 DEFAULT_ELASTODYN_OUT = ["RotSpeed", "BldPitch1"]
-DEFAULT_SERVODYN_OUT = ["GenPwr", "GenTq"]
+DEFAULT_SERVODYN_OUT = ["GenPwr"]
 RENAME = {
     "Time_[s]": "time",
     "Wind1VelX_[m/s]": "v0",
     "RotSpeed_[rpm]": "rot_speed",
     "BldPitch1_[deg]": "pitch",
     "GenPwr_[kW]": "gen_power",
-    "GenTq_[kN-m]": "gen_torque",
 }
 
 
@@ -220,9 +219,9 @@ def run_fast(
             rmtree(temp_dir)
 
         # Print stdout and stderr.
-        for fst_file in outfiles:
-            print(f"########## {Path(fst_file).stem} ##########\n")
-            print(open(fst_file, "r").read())
+        for file in outfiles:
+            print(f"########## {Path(file).stem} ##########\n")
+            print(open(file, "r").read())
 
     ################################################################################################
     # Process output.
