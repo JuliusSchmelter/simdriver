@@ -59,10 +59,10 @@ def run_turbsim(
 
     # Apply wind speed and turbulence intensity.
     # Make sure wind speed and turbulence intensity are lists.
-    if not isinstance(wind_speed, list):
+    if isinstance(wind_speed, int) or isinstance(wind_speed, float):
         wind_speed = [wind_speed]
 
-    if not isinstance(turbulence_intensity, list):
+    if isinstance(turbulence_intensity, int) or isinstance(turbulence_intensity, float):
         turbulence_intensity = [turbulence_intensity]
 
     # Generate all possible combinations of input parameters.

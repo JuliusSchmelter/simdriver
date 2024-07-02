@@ -78,7 +78,7 @@ def run_fast(
     # Steady wind speed.
     if steady_wind_speed is not None:
         # Make sure steady_wind_speed is a list.
-        if not isinstance(steady_wind_speed, list):
+        if isinstance(steady_wind_speed, int) or isinstance(steady_wind_speed, float):
             steady_wind_speed = [steady_wind_speed]
 
         # Set wind input to steady wind.
