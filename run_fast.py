@@ -53,8 +53,14 @@ def run_fast(
     if not Path(output_dir).exists():
         Path(output_dir).mkdir(parents=True)
 
-    # Load fast input file template.
-    fst_file = FASTInputFile(resources / "fast_template.fst")
+    # Load input file templates.
+    version_id = fast_version.replace(".", "_")
+    try:
+        fst_file = FASTInputFile(resources / f"fast_template_{version_id}.fst")
+        inflow_file = FASTInputFile(f"{resources}/inflow_template_{version_id}.dat")
+    except Exception: 
+        print("Error: OpenFAST version not supported.")
+        exit(1)
 
     # Apply scalar parameters.
     fst_file["TMax"] = time_span
@@ -62,11 +68,6 @@ def run_fast(
 
     ################################################################################################
     # Prepare inflow.
-    # Load inflow file template.
-    inflow_file = FASTInputFile(
-        f"{resources}/inflow_template_{fast_version.replace(".", "_")}.dat"
-    )
-
     # Set wind speed output at hub height.
     elastodyn_file = FASTInputFile(f"{model_dir}/{elastodyn}")
     hub_height = elastodyn_file["TowerHt"] + elastodyn_file["Twr2Shft"]
@@ -211,17 +212,24 @@ def run_fast(
             )
 
         # Wait for all tasks to finish.
+        error = False
         for task in tasks:
-            task.wait()
-
-        # Clean up temporary directories.
-        for temp_dir in temp_dirs:
-            rmtree(temp_dir)
+            return_code = task.wait()
+            if return_code != 0:
+                error = True
 
         # Print stdout and stderr.
         for file in outfiles:
             print(f"########## {Path(file).stem} ##########\n")
             print(open(file, "r").read())
+
+        # Exit due to error or clean up temporary directories.
+        if error:
+            print("OpenFAST error - programm aborted.")
+            exit(1)
+        else:
+            for temp_dir in temp_dirs:
+                rmtree(temp_dir)
 
     ################################################################################################
     # Process output.
