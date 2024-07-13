@@ -20,6 +20,7 @@ def run_turbsim(
     ref_height: float | None = None,
     time_span: int = 660,
     time_step: float = 0.05,
+    output_type: str = "bts",
     rand_seed: int | None = None,
     # Float or None to use default value.
     power_law_exponent: float | None = None,
@@ -44,6 +45,15 @@ def run_turbsim(
     file["HubHt"] = hub_height
     file["AnalysisTime"] = time_span
     file["TimeStep"] = time_step
+
+    if output_type == "bts":
+        file["WrADFF"] = True
+        file["WrBLFF"] = False
+    elif output_type == "wnd":
+        file["WrADFF"] = False
+        file["WrBLFF"] = True
+    else: 
+        raise ValueError("Unknown output_type. Use 'bts' our 'wnd'.")
 
     if ref_height is None:
         file["RefHt"] = hub_height

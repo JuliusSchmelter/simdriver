@@ -8,26 +8,42 @@ from shutil import copytree, rmtree
 
 from openfast_toolbox.io import FASTInputFile, FASTOutputFile
 
-DEFAULT_ELASTODYN_OUT = ["RotSpeed", "BldPitch1"]
+DEFAULT_ELASTODYN_OUT = [
+    "RotSpeed",
+    "BldPitch1",
+    "RotTorq",
+    "RootMEdg1",
+    "RootMFlp1",
+    "RootMEdg2",
+    "RootMFlp2",
+    "RootMEdg3",
+    "RootMFlp3",
+    "TwrBsMxt",
+    "TwrBsMyt",
+]
 DEFAULT_SERVODYN_OUT = ["GenPwr"]
 RENAME = {
     "Time_[s]": "time",
     "Wind1VelX_[m/s]": "v0",
     "RotSpeed_[rpm]": "rot_speed",
+    "RotTorq_[kN-m]": "rot_torque",
+    "GenPwr_[kW]": "gen_power",
     "BldPitch1_[deg]": "pitch",
-    "GenPwr_[kW]": "power",
+    "RootMEdg1_[kN-m]": "M_b1_e",
+    "RootMFlp1_[kN-m]": "M_b1_f",
+    "RootMEdg2_[kN-m]": "M_b2_e",
+    "RootMFlp2_[kN-m]": "M_b2_f",
+    "RootMEdg3_[kN-m]": "M_b3_e",
+    "RootMFlp3_[kN-m]": "M_b3_f",
+    "TwrBsMyt_[kN-m]": "M_tower_fa",
+    "TwrBsMxt_[kN-m]": "M_tower_ss",
 }
 
 
 def run_fast(
     output_dir: str,
     model_dir: str,
-    aerodyn: str,
-    servodyn: str,
-    elastodyn: str,
-    beamdyn_blade: str | list[str] | None = None,
-    subdyn: str | None = None,
-    ext_ptfm: str | None = None,
+    input_file: str,
     wind_files: str | list[str] | None = None,
     steady_wind_speed: float | list[float] | None = None,
     steady_power_law_exponent: float = 0.2,
@@ -53,23 +69,20 @@ def run_fast(
     if not Path(output_dir).exists():
         Path(output_dir).mkdir(parents=True)
 
-    # Load input file templates.
+    # Load input file template.
     version_id = fast_version.replace(".", "_")
     try:
-        fst_file = FASTInputFile(resources / f"fast_template_{version_id}.fst")
         inflow_file = FASTInputFile(f"{resources}/inflow_template_{version_id}.dat")
-    except Exception: 
-        print("Error: OpenFAST version not supported.")
-        exit(1)
-
-    # Apply scalar parameters.
-    fst_file["TMax"] = time_span
-    fst_file["DT"] = time_step
+    except Exception:
+        raise ValueError("Error: OpenFAST version not supported.")
 
     ################################################################################################
     # Prepare inflow.
     # Set wind speed output at hub height.
-    elastodyn_file = FASTInputFile(f"{model_dir}/{elastodyn}")
+    fst_file_template = FASTInputFile(f"{os.getcwd()}/{model_dir}/{input_file}")
+    elastodyn_file = FASTInputFile(
+        f"{os.getcwd()}/{model_dir}/{fst_file_template["EDFile"].strip('"')}"
+    )
     hub_height = elastodyn_file["TowerHt"] + elastodyn_file["Twr2Shft"]
     inflow_file["WindVziList"] = hub_height
 
@@ -101,35 +114,44 @@ def run_fast(
             inflow_file.write(path)
             inflow_files.append(path)
 
-    # TurbSim wind input.
+    # Turbulent wind input.
     elif steady_wind_speed is None:
-        # Find TurbSim files.
+        # Find input files.
         if not isinstance(wind_files, list):
             if wind_files is None:
                 wind_files = output_dir
 
-            bts_files = glob(f"{wind_files}/*.bts")
-            if len(bts_files) == 0:
+            turb_files = glob(f"{wind_files}/*.bts") + glob(f"{wind_files}/*.wnd")
+            if len(turb_files) == 0:
                 raise ValueError("no wind input found.")
         else:
-            bts_files = wind_files
-
-        # Set wind input to TurbSim.
-        inflow_file["WindType"] = 3
+            turb_files = wind_files
 
         # Loop over TurbSim files.
-        for bts_file in bts_files:
-            # Try both for compatibility with older versions.
-            inflow_file["Filename"] = f'"{os.getcwd()}/{bts_file}"'
-            inflow_file["Filename_BTS"] = f'"{os.getcwd()}/{bts_file}"'
+        for turb_file in turb_files:
+            if turb_file.endswith("bts"):
+                # Set wind input to TurbSim.
+                inflow_file["WindType"] = 3
+
+                # Try both for compatibility with older versions.
+                inflow_file["Filename"] = f'"{os.getcwd()}/{turb_file}"'
+                inflow_file["Filename_BTS"] = f'"{os.getcwd()}/{turb_file}"'
+
+            elif turb_file.endswith("wnd"):
+                # Set wind input to TurbSim.
+                inflow_file["WindType"] = 4
+
+                inflow_file["FilenameRoot"] = (
+                    f'"{os.getcwd()}/{turb_file.removesuffix(".wnd")}"'
+                )
+
+            else:
+                raise ValueError("Unknown wind file. Use '.bts' or '.wnd'.")
 
             # Write inflow file.
-            path = f"{os.getcwd()}/{output_dir}/{Path(bts_file).stem}.dat"
+            path = f"{os.getcwd()}/{output_dir}/{Path(turb_file).stem}.dat"
             inflow_file.write(path)
             inflow_files.append(path)
-
-    else:
-        raise ValueError("invalid combination of parameters.")
 
     ################################################################################################
     # Run FAST in parallel.
@@ -158,54 +180,56 @@ def run_fast(
 
             copytree(model_dir, temp_dir)
 
-            # Set FAST input file parameters.
-            # ElastoDyn.
-            elastodyn_path = f"{temp_dir}/{elastodyn}"
-            fst_file["EDFile"] = f'"{elastodyn_path}"'
-            elastodyn_file = FASTInputFile(elastodyn_path)
-            elastodyn_file["OutList"] = [""] + DEFAULT_ELASTODYN_OUT + elastodyn_out
-            elastodyn_file.write(elastodyn_path)
+            # Prepare FAST input file.
+            fst_file = FASTInputFile(f"{os.getcwd()}/{model_dir}/{input_file}")
 
-            # BeamDyn.
-            if beamdyn_blade is not None:
-                if not isinstance(beamdyn_blade, list):
-                    beamdyn_blade = [beamdyn_blade] * 3
-
-                for i, blade in enumerate(beamdyn_blade):
-                    fst_file[f"BDBldFile({i+1})"] = f'"{temp_dir}/{blade}"'
-
-            # AeroDyn.
-            fst_file["AeroFile"] = f'"{temp_dir}/{aerodyn}"'
-
-            # ServoDyn.
-            servodyn_path = f"{temp_dir}/{servodyn}"
-            fst_file["ServoFile"] = f'"{servodyn_path}"'
-            servodyn_file = FASTInputFile(servodyn_path)
-            servodyn_file["OutList"] = [""] + DEFAULT_SERVODYN_OUT + servodyn_out
-            servodyn_file.write(servodyn_path)
-
-            # SubDyn or ExtPtfm.
-            if subdyn is not None:
-                fst_file["CompSub"] = 1
-                fst_file["SubFile"] = f'"{temp_dir}/{subdyn}"'
-
-            if ext_ptfm is not None:
-                fst_file["CompSub"] = 2
-                fst_file["SubFile"] = f'"{temp_dir}/{ext_ptfm}"'
-
-            # InflowWind.
             fst_file["InflowFile"] = f'"{inflow_file}"'
 
-            # Write main fast input file.
-            input_file = f"{output_dir}/{Path(inflow_file).stem}.fst"
-            fst_file.write(input_file)
+            fst_file["TMax"] = time_span
+            fst_file["DT"] = time_step
+            fst_file["OutFileFmt"] = 2
+            fst_file["SumPrint"] = True
+
+            dat_files = [
+                "EDFile",
+                "BDBldFile(1)",
+                "BDBldFile(2)",
+                "BDBldFile(3)",
+                "AeroFile",
+                "ServoFile",
+                "HydroFile",
+                "SubFile",
+                "MooringFile",
+                "IceFile",
+                "SWELidarFile",
+            ]
+            for dat_file in dat_files:
+                try:
+                    fst_file[dat_file] = f'"{temp_dir}/{fst_file[dat_file].strip('"')}"'
+                except Exception:
+                    pass
+
+            # Set output parameters.
+            # ElastoDyn.
+            elastodyn_file = FASTInputFile(fst_file["EDFile"].strip('"'))
+            elastodyn_file["OutList"] = [""] + DEFAULT_ELASTODYN_OUT + elastodyn_out
+            elastodyn_file.write(fst_file["EDFile"].strip('"'))
+
+            # ServoDyn.
+            servodyn_file = FASTInputFile(fst_file["ServoFile"].strip('"'))
+            servodyn_file["OutList"] = [""] + DEFAULT_SERVODYN_OUT + servodyn_out
+            servodyn_file.write(fst_file["ServoFile"].strip('"'))
+
+            # Write input file.
+            fst_file_path = f"{output_dir}/{Path(inflow_file).stem}.fst"
+            fst_file.write(fst_file_path)
 
             # Run FAST.
-            stdout = Path(input_file).with_suffix(".out")
+            stdout = Path(fst_file_path).with_suffix(".out")
             outfiles.append(stdout)
             tasks.append(
                 subprocess.Popen(
-                    [fast_exe, input_file],
+                    [fast_exe, fst_file_path],
                     stdout=open(stdout, "w"),
                     stderr=subprocess.STDOUT,
                 )
@@ -225,11 +249,16 @@ def run_fast(
 
         # Exit due to error or clean up temporary directories.
         if error:
-            print("OpenFAST error - programm aborted.")
-            exit(1)
+            raise Exception("OpenFAST Error")
         else:
             for temp_dir in temp_dirs:
-                rmtree(temp_dir)
+                # Ugly hack, I don't know why this is necessary.
+                for _ in range(10):
+                    try:
+                        rmtree(temp_dir, ignore_errors=True)
+                        Path(temp_dir).rmdir()
+                    except Exception:
+                        pass
 
     ################################################################################################
     # Process output.
