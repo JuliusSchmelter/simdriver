@@ -55,6 +55,7 @@ def run_fast(
     custom_fast: str | None = None,
     fast_version: str = "3.5",
     max_processes: int = 32,
+    verbose: bool = False,
 ):
     # Path to resource directory.
     resources = Path(__file__).parent / "resources"
@@ -159,15 +160,15 @@ def run_fast(
     counter = 1
     for batch in batched(inflow_files, max_processes):
         print(
-            f"\nstarting batch {counter}/{math.ceil(len(inflow_files) / float(max_processes))} ...\n"
+            f"starting batch {counter}/{math.ceil(len(inflow_files) / float(max_processes))} ...\n"
         )
         counter += 1
 
         # Iterate over batch and process it in parallel.
-        outfiles = []
         temp_dirs = []
-        tasks = []
+        fst_files = []
         for inflow_file in batch:
+            print(f"preparing {Path(inflow_file).stem} ...")
             # Prepare temporary working directory.
             temp_dir = f"{os.getcwd()}/{output_dir}/temp_{Path(inflow_file).stem}"
             temp_dirs.append(temp_dir)
@@ -223,34 +224,44 @@ def run_fast(
             # Write input file.
             fst_file_path = f"{output_dir}/{Path(inflow_file).stem}.fst"
             fst_file.write(fst_file_path)
+            fst_files.append(fst_file_path)
 
-            # Run FAST.
+        # Run FAST.
+        print("\nrunning OpenFAST ...\n")
+        tasks = []
+        outfiles = []
+        for fst_file_path in fst_files:
             stdout = Path(fst_file_path).with_suffix(".out")
             outfiles.append(stdout)
             tasks.append(
-                subprocess.Popen(
-                    [fast_exe, fst_file_path],
-                    stdout=open(stdout, "w"),
-                    stderr=subprocess.STDOUT,
+                (
+                    subprocess.Popen(
+                        [fast_exe, fst_file_path],
+                        stdout=open(stdout, "w"),
+                        stderr=subprocess.STDOUT,
+                    ),
+                    Path(fst_file_path).stem,
                 )
             )
 
         # Wait for all tasks to finish.
         error = False
-        for task in tasks:
+        for task, case in tasks:
             return_code = task.wait()
+            print(f"task {case} finished with return code {return_code}.")
             if return_code != 0:
                 error = True
 
+        print("")
+
         # Print stdout and stderr.
-        for file in outfiles:
-            print(f"########## {Path(file).stem} ##########\n")
-            print(open(file, "r").read())
+        if verbose:
+            for file in outfiles:
+                print(f"########## {Path(file).stem} ##########\n")
+                print(open(file, "r").read())
 
         # Exit due to error or clean up temporary directories.
-        if error:
-            raise Exception("OpenFAST Error")
-        else:
+        if not error:
             for temp_dir in temp_dirs:
                 # Ugly hack, I don't know why this is necessary.
                 for _ in range(10):
@@ -262,14 +273,27 @@ def run_fast(
 
     ################################################################################################
     # Process output.
+    print("processing output ...")
+    failures = []
     for inflow_file in inflow_files:
-        # Load FAST output file.
-        output_file = FASTOutputFile(f"{output_dir}/{Path(inflow_file).stem}.outb")
+        try:
+            # Load FAST output file.
+            output_file = FASTOutputFile(f"{output_dir}/{Path(inflow_file).stem}.outb")
 
-        # Convert to parquet.
-        output_file.toDataFrame().rename(columns=RENAME).to_parquet(
-            f"{output_dir}/{Path(inflow_file).stem}.parquet"
-        )
+            # Convert to parquet.
+            output_file.toDataFrame().rename(columns=RENAME).to_parquet(
+                f"{output_dir}/{Path(inflow_file).stem}.parquet"
+            )
+        except Exception:
+            failures.append(Path(inflow_file).stem)
+
+    if len(failures):
+        print(f"{failures} of {len(inflow_files)} cases failed:")
+        for failure in failures:
+            print(failure)
 
     # Print completion message.
-    print("\nOpenFAST simulation completed.\n")
+    if error:
+        print("\nOpenFAST terminated, errors occured.\n")
+    else:
+        print("\nOpenFAST simulation completed successfully.\n")

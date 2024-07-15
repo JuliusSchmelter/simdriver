@@ -26,6 +26,7 @@ def run_turbsim(
     power_law_exponent: float | None = None,
     additional_params: dict = {},
     max_processes: int = 32,
+    verbose: bool = False,
 ) -> list[str]:
     # Path to resource directory.
     resources = Path(__file__).parent / "resources"
@@ -52,7 +53,7 @@ def run_turbsim(
     elif output_type == "wnd":
         file["WrADFF"] = False
         file["WrBLFF"] = True
-    else: 
+    else:
         raise ValueError("Unknown output_type. Use 'bts' our 'wnd'.")
 
     if ref_height is None:
@@ -92,7 +93,8 @@ def run_turbsim(
         file["IECturbc"] = ti
 
         # Write TurbSim input file.
-        path = f"{output_dir}/U_{u}_TI_{ti}.inp"
+        id = f"U_{float(u):05.2f}_TI_{float(ti):05.2f}".replace(".", "_")
+        path = f"{output_dir}/{id}.inp"
         file.write(path)
         inp_files.append(path)
 
@@ -110,21 +112,34 @@ def run_turbsim(
             stdout = Path(inp_file).with_suffix(".out")
             outfiles.append(stdout)
             tasks.append(
-                subprocess.Popen(
-                    [resources / "TurbSim.exe", inp_file],
-                    stdout=open(stdout, "w"),
-                    stderr=subprocess.STDOUT,
+                (
+                    subprocess.Popen(
+                        [resources / "TurbSim.exe", inp_file],
+                        stdout=open(stdout, "w"),
+                        stderr=subprocess.STDOUT,
+                    ),
+                    Path(inp_file).stem,
                 )
             )
 
         # Wait for all tasks to finish.
-        for task in tasks:
-            task.wait()
+        error = False
+        for task, case in tasks:
+            return_code = task.wait()
+            print(f"task {case} finished with return code {return_code}.")
+            if return_code != 0:
+                error = True
+
+        print("")
 
         # Print stdout and stderr.
-        for file in outfiles:
-            print(f"########## {Path(file).stem} ##########\n")
-            print(open(file, "r").read())
+        if verbose:
+            for file in outfiles:
+                print(f"########## {Path(file).stem} ##########\n")
+                print(open(file, "r").read())
 
     # Print completion message.
-    print("\nTurbSim simulation completed.\n")
+    if error:
+        print("\nTurbSim simulation completed successfully.\n")
+    else:
+        print("\nTurbSim simulation terminated, errors occured.\n")
