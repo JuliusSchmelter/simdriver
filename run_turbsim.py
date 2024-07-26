@@ -21,11 +21,11 @@ def run_turbsim(
     time_span: int = 660,
     time_step: float = 0.05,
     output_type: str = "bts",
-    rand_seed: int | None = None,
+    rand_seed: int | list[int] | None = None,
     # Float or None to use default value.
     power_law_exponent: float | None = None,
     additional_params: dict = {},
-    max_processes: int = 32,
+    max_processes: int = 20,
     verbose: bool = False,
 ) -> list[str]:
     # Path to resource directory.
@@ -102,7 +102,7 @@ def run_turbsim(
     counter = 1
     for batch in batched(inp_files, max_processes):
         print(
-            f"\nstarting batch {counter}/{math.ceil(len(inp_files) / float(max_processes))} ...\n"
+            f"starting batch {counter}/{math.ceil(len(inp_files) / float(max_processes))} ...\n"
         )
         counter += 1
 
@@ -140,6 +140,6 @@ def run_turbsim(
 
     # Print completion message.
     if error:
-        print("\nTurbSim simulation completed successfully.\n")
-    else:
         print("\nTurbSim simulation terminated, errors occured.\n")
+    else:
+        print("\nTurbSim simulation completed successfully.\n")

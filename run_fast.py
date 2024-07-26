@@ -54,7 +54,7 @@ def run_fast(
     servodyn_out: list[str] = [],
     custom_fast: str | None = None,
     fast_version: str = "3.5",
-    max_processes: int = 32,
+    max_processes: int = 20,
     verbose: bool = False,
 ):
     # Path to resource directory.
@@ -111,7 +111,8 @@ def run_fast(
             inflow_file["HWindSpeed"] = u
 
             # Write inflow file.
-            path = f"{os.getcwd()}/{output_dir}/U_{u}_TI_0.dat"
+            id = f"U_{float(u):05.2f}".replace(".", "_")
+            path = f"{os.getcwd()}/{output_dir}/{id}.dat"
             inflow_file.write(path)
             inflow_files.append(path)
 
