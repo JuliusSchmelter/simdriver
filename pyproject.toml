@@ -19,3 +19,6 @@ classifiers = [
 
 [project.urls]
 Repository = "https://github.com/JuliusSchmelter/simdriver"
+
+[tool.setuptools.package-data]
+simdriver = ["*"]
