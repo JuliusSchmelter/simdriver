@@ -7,7 +7,7 @@
 git clone https://github.com/JuliusSchmelter/simdriver.git
 cd simdriver
 python -m venv .env
-.\.env\Scripts\Activate.ps1
+.env\Scripts\Activate.ps1
 pip install .
 python example.py
 ```
