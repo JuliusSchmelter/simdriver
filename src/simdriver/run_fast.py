@@ -57,6 +57,28 @@ def run_fast(
     max_processes: int = 20,
     verbose: bool = False,
 ):
+    """
+    Run OpenFAST in parallel for multiple wind conditions.
+
+    Args:
+        output_dir: relative path to output directory.
+        model_dir: relative path to directory with OpenFAST model.
+        input_file: name of OpenFAST input file (.fst, inside model_dir).
+        wind_files: relative path to directory with TurbSim files (.bts, .wnd)
+                    or list of relative paths to TurbSim files.
+        steady_wind_speed: steady wind speed or list of steady wind speeds to be
+                    used instead of TurbSim input.
+        steady_power_law_exponent: power law exponent for steady wind input.
+        steady_reference_height: reference height for steady wind input.
+        time_span: simulation time span.
+        time_step: simulation time step.
+        elastodyn_out: additional ElastoDyn output parameters.
+        servodyn_out: additional ServoDyn output parameters.
+        custom_fast: relative path to custom OpenFAST executable.
+        fast_version: version of custom OpenFAST executable.
+        max_processes: maximum number of parallel processes.
+        verbose: print stdout and stderr of OpenFAST processes.
+    """
     # Path to resource directory.
     resources = Path(__file__).parent / "resources"
 

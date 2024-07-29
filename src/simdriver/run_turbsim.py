@@ -21,13 +21,36 @@ def run_turbsim(
     time_span: int = 660,
     time_step: float = 0.05,
     output_type: str = "bts",
-    rand_seed: int | list[int] | None = None,
-    # Float or None to use default value.
+    rand_seed: int | None = None,
     power_law_exponent: float | None = None,
     additional_params: dict = {},
     max_processes: int = 20,
     verbose: bool = False,
-) -> list[str]:
+):
+    """
+    Run TurbSim in parallel to generate turbulent wind fields.
+
+    Args:
+        output_dir: relative path to output directory.
+        grid_points_horizontal: number of grid points in horizontal direction.
+        grid_points_vertical: number of grid points in vertical direction.
+        grid_size_horizontal: grid size in meters in horizontal direction.
+        grid_size_vertical: grid size in meters in vertical direction.
+        hub_height: hub height in meters.
+        wind_speed: wind speed in m/s, float or a list of floats.
+        turbulence_intensity: turbulence intensity in %, float or a list of floats.
+        wind_and_ti: alternative input for custom combinations: list of tuples
+                     with wind speed and turbulence intensity.
+        ref_height: reference height in meters, default is hub height.
+        time_span: simulation time in seconds.
+        time_step: time step in seconds.
+        output_type: output file type, either 'bts' or 'wnd'.
+        rand_seed: custom random seed, default generates a new random seed for each case.
+        power_law_exponent: power law exponent, None for default value.
+        additional_params: additional input parameters as dictionary.
+        max_processes: maximum number of parallel processes.
+        verbose: print stdout and stderr of TurbSim.
+    """
     # Path to resource directory.
     resources = Path(__file__).parent / "resources"
 
