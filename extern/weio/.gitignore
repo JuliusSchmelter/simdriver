@@ -1,9 +1,0 @@
-*.pyc
-*.egg-info
-build
-dist
-*.spec
-*_TODO*
-*.pdf
-*.png
-_*

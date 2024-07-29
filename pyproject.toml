@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "test"
+version = "0.0.1"
+description = "OpenFAST Simulation Manager"
+authors = [
+    { name = "Julius Schmelter", email = "schmelter@ifb.uni-stuttgart.de" },
+]
+requires-python = ">=3.12"
+dependencies = ["weio>=1.0.0"]
+readme = "README.md"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+]
