@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "simdriver"
-version = "0.0.1"
+version = "0.0.2"
 description = "OpenFAST Simulation Manager"
 authors = [
     { name = "Julius Schmelter", email = "schmelter@ifb.uni-stuttgart.de" },

@@ -133,7 +133,7 @@ def run_fast(
             inflow_file["HWindSpeed"] = u
 
             # Write inflow file.
-            id = f"U_{float(u):05.2f}".replace(".", "_")
+            id = f"U_{float(u):05.2f}".replace(".", "d")
             path = f"{os.getcwd()}/{output_dir}/{id}.dat"
             inflow_file.write(path)
             inflow_files.append(path)

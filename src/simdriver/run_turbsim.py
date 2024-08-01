@@ -23,6 +23,7 @@ def run_turbsim(
     output_type: str = "bts",
     rand_seed: int | None = None,
     power_law_exponent: float | None = None,
+    wind_fields_per_case: int = 1,
     additional_params: dict = {},
     max_processes: int = 20,
     verbose: bool = False,
@@ -47,6 +48,7 @@ def run_turbsim(
         output_type: output file type, either 'bts' or 'wnd'.
         rand_seed: custom random seed, default generates a new random seed for each case.
         power_law_exponent: power law exponent, None for default value.
+        wind_fields_per_case: number of wind fields with different seeds per case.
         additional_params: additional input parameters as dictionary.
         max_processes: maximum number of parallel processes.
         verbose: print stdout and stderr of TurbSim.
@@ -105,21 +107,27 @@ def run_turbsim(
         wind_and_ti = list(product(wind_speed, turbulence_intensity))
 
     for u, ti in wind_and_ti:
-        # Apply user-defined seed or generate random seed.
-        if rand_seed is None:
-            file["RandSeed1"] = random.randint(-2147483648, 2147483647)
-        else:
-            file["RandSeed1"] = rand_seed
+        for i in range(1, wind_fields_per_case + 1):
+            # Apply user-defined seed or generate random seed.
+            if rand_seed is None:
+                file["RandSeed1"] = random.randint(-2147483648, 2147483647)
+            else:
+                file["RandSeed1"] = rand_seed
 
-        # Apply wind speed and turbulence intensity.
-        file["URef"] = u
-        file["IECturbc"] = ti
+            # Apply wind speed and turbulence intensity.
+            file["URef"] = u
+            file["IECturbc"] = ti
 
-        # Write TurbSim input file.
-        id = f"U_{float(u):05.2f}_TI_{float(ti):05.2f}".replace(".", "_")
-        path = f"{output_dir}/{id}.inp"
-        file.write(path)
-        inp_files.append(path)
+            # Write TurbSim input file.
+            if wind_fields_per_case > 1:
+                id = f"U_{float(u):05.2f}_TI_{float(ti):05.2f}_C_{i:02d}".replace(
+                    ".", "d"
+                )
+            else:
+                id = f"U_{float(u):05.2f}_TI_{float(ti):05.2f}".replace(".", "d")
+            path = f"{output_dir}/{id}.inp"
+            file.write(path)
+            inp_files.append(path)
 
     # Run TurbSim in parallel.
     counter = 1

@@ -29,7 +29,8 @@ simdriver.run_turbsim(
     time_span=SIM_TIME,
     time_step=0.25,
     power_law_exponent=0.2,
-    max_processes=2,
+    wind_fields_per_case=2,
+    max_processes=4,
 )
 
 # Simulate turbulent wind conditions.
@@ -43,21 +44,24 @@ simdriver.run_fast(
 )
 
 # Plot results.
-steady = pd.read_parquet("data/output_steady/U_15_00.parquet")
-turb = pd.read_parquet("data/output_turb/U_15_00_TI_10_00.parquet")
+steady = pd.read_parquet("data/output_steady/U_15d00.parquet")
+turb_case_1 = pd.read_parquet("data/output_turb/U_15d00_TI_10d00_C_01.parquet")
+turb_case_2 = pd.read_parquet("data/output_turb/U_15d00_TI_10d00_C_02.parquet")
 
 plt.figure()
 plt.subplot(2, 1, 1)
 plt.title("Wind Speed and Blade Pitch")
 plt.plot(steady["time"], steady["v0"], label="steady wind")
-plt.plot(turb["time"], turb["v0"], label="turbulent wind")
+plt.plot(turb_case_1["time"], turb_case_1["v0"], label="turbulent wind, case 1")
+plt.plot(turb_case_2["time"], turb_case_2["v0"], label="turbulent wind, case 2")
 plt.ylabel("Wind Speed [m/s]")
 plt.xlim(0, SIM_TIME)
 plt.legend()
 
 plt.subplot(2, 1, 2)
 plt.plot(steady["time"], steady["pitch"], label="steady wind")
-plt.plot(turb["time"], turb["pitch"], label="turbulent wind")
+plt.plot(turb_case_1["time"], turb_case_1["pitch"], label="turbulent wind, case 1")
+plt.plot(turb_case_2["time"], turb_case_2["pitch"], label="turbulent wind, case 1")
 plt.xlabel("Time [s]")
 plt.ylabel("Blade Pitch [deg]")
 plt.xlim(0, SIM_TIME)
