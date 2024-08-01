@@ -10,7 +10,7 @@ pip install git+https://github.com/JuliusSchmelter/simdriver.git
 ## Install and Run Example
 
 ```PowerShell
-git clone https://github.com/JuliusSchmelter/simdriver.git
+git clone https://github.com/JuliusSchmelter/simdriver
 cd simdriver
 python -m venv .env
 .env\Scripts\Activate.ps1
