@@ -24,6 +24,7 @@ def run_turbsim(
     rand_seed: int | None = None,
     power_law_exponent: float | None = None,
     wind_fields_per_case: int = 1,
+    first_wind_field_number: int = 1,
     additional_params: dict = {},
     max_processes: int = 20,
     verbose: bool = False,
@@ -49,6 +50,7 @@ def run_turbsim(
         rand_seed: custom random seed, default generates a new random seed for each case.
         power_law_exponent: power law exponent, None for default value.
         wind_fields_per_case: number of wind fields with different seeds per case.
+        first_wind_field_number: number of first wind field when multiple are generated, default is 1.
         additional_params: additional input parameters as dictionary.
         max_processes: maximum number of parallel processes.
         verbose: print stdout and stderr of TurbSim.
@@ -106,8 +108,10 @@ def run_turbsim(
     if wind_and_ti is None:
         wind_and_ti = list(product(wind_speed, turbulence_intensity))
 
-    for u, ti in wind_and_ti:
-        for i in range(1, wind_fields_per_case + 1):
+    for i in range(
+        first_wind_field_number, first_wind_field_number + wind_fields_per_case
+    ):
+        for u, ti in wind_and_ti:
             # Apply user-defined seed or generate random seed.
             if rand_seed is None:
                 file["RandSeed1"] = random.randint(-2147483648, 2147483647)
@@ -119,7 +123,7 @@ def run_turbsim(
             file["IECturbc"] = ti
 
             # Write TurbSim input file.
-            if wind_fields_per_case > 1:
+            if wind_fields_per_case > 1 or first_wind_field_number != 1:
                 id = f"U_{float(u):05.2f}_TI_{float(ti):05.2f}_C_{i:02d}".replace(
                     ".", "d"
                 )
