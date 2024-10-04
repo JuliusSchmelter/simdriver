@@ -42,7 +42,6 @@ RENAME = {
 
 def run_fast(
     output_dir: str,
-    model_dir: str,
     input_file: str,
     wind_files: str | list[str] | None = None,
     steady_wind_speed: float | list[float] | None = None,
@@ -56,31 +55,37 @@ def run_fast(
     fast_version: str = "3.5",
     max_processes: int = 20,
     verbose: bool = False,
+    initialize_turbine_state: bool = True,
+    initialization_options: dict = {},
 ):
     """
     Run OpenFAST in parallel for multiple wind conditions.
 
     Args:
-        output_dir: relative path to output directory.
-        model_dir: relative path to directory with OpenFAST model.
-        input_file: name of OpenFAST input file (.fst, inside model_dir).
-        wind_files: relative path to directory with TurbSim files (.bts, .wnd)
+        output_dir: Relative path to output directory.
+        input_file: Path to OpenFAST input file (.fst).
+        wind_files: Relative path to directory with TurbSim files (.bts, .wnd)
                     or list of relative paths to TurbSim files.
-        steady_wind_speed: steady wind speed or list of steady wind speeds to be
+        steady_wind_speed: Steady wind speed or list of steady wind speeds to be
                     used instead of TurbSim input.
-        steady_power_law_exponent: power law exponent for steady wind input.
-        steady_reference_height: reference height for steady wind input.
-        time_span: simulation time span.
-        time_step: simulation time step.
-        elastodyn_out: additional ElastoDyn output parameters.
-        servodyn_out: additional ServoDyn output parameters.
-        custom_fast: relative path to custom OpenFAST executable.
-        fast_version: version of custom OpenFAST executable.
-        max_processes: maximum number of parallel processes.
-        verbose: print stdout and stderr of OpenFAST processes.
+        steady_power_law_exponent: Power law exponent for steady wind input.
+        steady_reference_height: Reference height for steady wind input.
+        time_span: Simulation time span.
+        time_step: Simulation time step.
+        elastodyn_out: Additional ElastoDyn output parameters.
+        servodyn_out: Additional ServoDyn output parameters.
+        custom_fast: Relative path to custom OpenFAST executable.
+        fast_version: Version of custom OpenFAST executable.
+        max_processes: Maximum number of parallel processes.
+        verbose: Print stdout and stderr of OpenFAST processes.
+        initialize_turbine_state: Initialize turbine state before simulating, default is True.
+        initialization_options: Custom input parameters for finding the initial turbine state.
     """
     # Path to resource directory.
     resources = Path(__file__).parent / "resources"
+
+    # Path to model directory.
+    model_dir = Path(input_file).parent
 
     # Path to FAST executable.
     if custom_fast is not None:
@@ -102,7 +107,7 @@ def run_fast(
     ################################################################################################
     # Prepare inflow.
     # Set wind speed output at hub height.
-    fst_file_template = FASTInputFile(f"{os.getcwd()}/{model_dir}/{input_file}")
+    fst_file_template = FASTInputFile(f"{os.getcwd()}/{input_file}")
     elastodyn_file = FASTInputFile(
         f"{os.getcwd()}/{model_dir}/{fst_file_template["EDFile"].strip('"')}"
     )
@@ -205,7 +210,7 @@ def run_fast(
             copytree(model_dir, temp_dir)
 
             # Prepare FAST input file.
-            fst_file = FASTInputFile(f"{os.getcwd()}/{model_dir}/{input_file}")
+            fst_file = FASTInputFile(f"{os.getcwd()}/{input_file}")
 
             fst_file["InflowFile"] = f'"{inflow_file}"'
 
@@ -236,6 +241,12 @@ def run_fast(
             # Set output parameters.
             # ElastoDyn.
             elastodyn_file = FASTInputFile(fst_file["EDFile"].strip('"'))
+            if initialize_turbine_state:
+                pass
+            else:
+                # Set initial rotor speed to zero,
+                # because this option is normally used by the initial_state function.
+                elastodyn_file["RotSpeed"] = 0
             elastodyn_file["OutList"] = [""] + DEFAULT_ELASTODYN_OUT + elastodyn_out
             elastodyn_file.write(fst_file["EDFile"].strip('"'))
 

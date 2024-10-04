@@ -22,7 +22,7 @@ def run_turbsim(
     time_step: float = 0.05,
     output_type: str = "bts",
     rand_seed: int | None = None,
-    power_law_exponent: float | None = None,
+    power_law_exponent: float = 0.2,
     wind_fields_per_case: int = 1,
     first_wind_field_number: int = 1,
     additional_params: dict = {},
@@ -33,26 +33,26 @@ def run_turbsim(
     Run TurbSim in parallel to generate turbulent wind fields.
 
     Args:
-        output_dir: relative path to output directory.
-        grid_points_horizontal: number of grid points in horizontal direction.
-        grid_points_vertical: number of grid points in vertical direction.
-        grid_size_horizontal: grid size in meters in horizontal direction.
-        grid_size_vertical: grid size in meters in vertical direction.
-        hub_height: hub height in meters.
-        wind_speed: wind speed in m/s, float or a list of floats.
-        turbulence_intensity: turbulence intensity in %, float or a list of floats.
-        wind_and_ti: alternative input for custom combinations: list of tuples
+        output_dir: Relative path to output directory.
+        grid_points_horizontal: Number of grid points in horizontal direction.
+        grid_points_vertical: Number of grid points in vertical direction.
+        grid_size_horizontal: Grid size in meters in horizontal direction.
+        grid_size_vertical: Grid size in meters in vertical direction.
+        hub_height: Hub height in meters.
+        wind_speed: Wind speed in m/s, float or a list of floats.
+        turbulence_intensity: Turbulence intensity in %, float or a list of floats.
+        wind_and_ti: Alternative input for custom combinations: list of tuples
                      with wind speed and turbulence intensity.
-        ref_height: reference height in meters, default is hub height.
-        time_span: simulation time in seconds.
-        time_step: time step in seconds.
-        output_type: output file type, either 'bts' or 'wnd'.
-        rand_seed: custom random seed, default generates a new random seed for each case.
-        power_law_exponent: power law exponent, None for default value.
-        wind_fields_per_case: number of wind fields with different seeds per case.
-        first_wind_field_number: number of first wind field when multiple are generated, default is 1.
-        additional_params: additional input parameters as dictionary.
-        max_processes: maximum number of parallel processes.
+        ref_height: Reference height in meters, default is hub height.
+        time_span: Simulation time in seconds.
+        time_step: Time step in seconds.
+        output_type: Output file type, either 'bts' or 'wnd'.
+        rand_seed: Custom random seed, default generates a new random seed for each case.
+        power_law_exponent: Power law exponent, default 0.2. Use 0.14 as default for offshore.
+        wind_fields_per_case: Number of wind fields with different seeds per case.
+        first_wind_field_number: Number of first wind field when multiple are generated, default is 1.
+        additional_params: Additional input parameters as dictionary.
+        max_processes: Maximum number of parallel processes.
         verbose: print stdout and stderr of TurbSim.
     """
     # Path to resource directory.
@@ -88,8 +88,7 @@ def run_turbsim(
     else:
         file["RefHt"] = ref_height
 
-    if power_law_exponent is not None:
-        file["PLExp"] = power_law_exponent
+    file["PLExp"] = power_law_exponent
 
     # Apply additional parameters.
     for key, value in additional_params.items():

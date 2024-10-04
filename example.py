@@ -6,14 +6,13 @@ SIM_TIME = 60
 
 # Simulate steady wind conditions.
 simdriver.run_fast(
+    input_file="extern/NREL_5MW/NREL_5MW.fst",
     output_dir="data/output_steady",
     steady_wind_speed=[5, 15],
     steady_reference_height=90,
     steady_power_law_exponent=0.2,
     time_span=SIM_TIME,
     time_step=0.01,
-    model_dir="extern/NREL_5MW",
-    input_file="NREL_5MW.fst",
 )
 
 # Generate turbulent wind fields.
@@ -35,12 +34,11 @@ simdriver.run_turbsim(
 
 # Simulate turbulent wind conditions.
 simdriver.run_fast(
+    input_file="extern/NREL_5MW/NREL_5MW.fst",
     wind_files="data/wind",
     output_dir="data/output_turb",
     time_span=SIM_TIME,
     time_step=0.01,
-    model_dir="extern/NREL_5MW",
-    input_file="NREL_5MW.fst",
 )
 
 # Plot results.
