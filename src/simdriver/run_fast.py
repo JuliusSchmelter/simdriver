@@ -5,8 +5,11 @@ from glob import glob
 from itertools import batched
 import math
 from shutil import copytree, rmtree
-
+import polars as pl
+from polars import col
 from weio import FASTInputFile, FASTOutputFile
+
+from . import initial_state
 
 DEFAULT_ELASTODYN_OUT = [
     "RotSpeed",
@@ -46,7 +49,7 @@ def run_fast(
     wind_files: str | list[str] | None = None,
     steady_wind_speed: float | list[float] | None = None,
     steady_power_law_exponent: float = 0.2,
-    steady_reference_height: float | None = None,
+    reference_height: float | None = None,
     time_span: float = 660,
     time_step: float = 0.01,
     elastodyn_out: list[str] = [],
@@ -57,19 +60,20 @@ def run_fast(
     verbose: bool = False,
     initialize_turbine_state: bool = True,
     initialization_options: dict = {},
+    custom_initial_state: str | None = None,
 ):
     """
     Run OpenFAST in parallel for multiple wind conditions.
 
     Args:
         output_dir: Relative path to output directory.
-        input_file: Path to OpenFAST input file (.fst).
-        wind_files: Relative path to directory with TurbSim files (.bts, .wnd)
+        input_file: Relative path to OpenFAST input file (.fst).
+        wind_files: Relative path to directory with TurbSim files (.bts, .wnd, .hh)
                     or list of relative paths to TurbSim files.
         steady_wind_speed: Steady wind speed or list of steady wind speeds to be
                     used instead of TurbSim input.
-        steady_power_law_exponent: Power law exponent for steady wind input.
-        steady_reference_height: Reference height for steady wind input.
+        steady_power_law_exponent: Power law exponent for steady wind input, default is 0.2.
+        reference_height: Reference height for steady or uniform wind input, default is hub height.
         time_span: Simulation time span.
         time_step: Simulation time step.
         elastodyn_out: Additional ElastoDyn output parameters.
@@ -80,6 +84,7 @@ def run_fast(
         verbose: Print stdout and stderr of OpenFAST processes.
         initialize_turbine_state: Initialize turbine state before simulating, default is True.
         initialization_options: Custom input parameters for finding the initial turbine state.
+        custom_initial_state: Relative path to custom initial state file.
     """
     # Path to resource directory.
     resources = Path(__file__).parent / "resources"
@@ -114,6 +119,13 @@ def run_fast(
     hub_height = elastodyn_file["TowerHt"] + elastodyn_file["Twr2Shft"]
     inflow_file["WindVziList"] = hub_height
 
+    # Get reference height for steady or uniform wind input.
+    if reference_height is None:
+        reference_height = hub_height
+
+    # Get rotor diameter for uniform wind input.
+    rotor_diameter = elastodyn_file["TipRad"] * 2
+
     # Collect inflow files.
     inflow_files = []
 
@@ -127,10 +139,7 @@ def run_fast(
         inflow_file["WindType"] = 1
 
         # Configure steady wind inflow parameters.
-        if steady_reference_height is None:
-            steady_reference_height = hub_height
-
-        inflow_file["RefHt"] = steady_reference_height
+        inflow_file["RefHt"] = reference_height
         inflow_file["PLexp"] = steady_power_law_exponent
 
         # Loop over wind speeds.
@@ -143,44 +152,76 @@ def run_fast(
             inflow_file.write(path)
             inflow_files.append(path)
 
-    # Turbulent wind input.
-    elif steady_wind_speed is None:
+    # Non-steady wind input.
+    else:
         # Find input files.
         if not isinstance(wind_files, list):
             if wind_files is None:
                 wind_files = output_dir
 
-            turb_files = glob(f"{wind_files}/*.bts") + glob(f"{wind_files}/*.wnd")
-            if len(turb_files) == 0:
+            wind_files_list = (
+                glob(f"{wind_files}/*.bts")
+                + glob(f"{wind_files}/*.wnd")
+                + glob(f"{wind_files}/*.hh")
+            )
+            if len(wind_files_list) == 0:
                 raise ValueError("no wind input found.")
         else:
-            turb_files = wind_files
+            wind_files_list = wind_files
 
-        # Loop over TurbSim files.
-        for turb_file in turb_files:
-            if turb_file.endswith("bts"):
+        # Loop over wind input files.
+        for wind_file in wind_files_list:
+            if wind_file.endswith("hh"):
+                # Set wind input to uniform wind.
+                inflow_file["WindType"] = 2
+
+                inflow_file["FileName_Uni"] = f'"{os.getcwd()}/{wind_file}"'
+                inflow_file["RefHt_Uni"] = reference_height
+                inflow_file["RefLength"] = rotor_diameter
+
+            elif wind_file.endswith("bts"):
                 # Set wind input to TurbSim.
                 inflow_file["WindType"] = 3
 
                 # Try both for compatibility with older versions.
-                inflow_file["Filename"] = f'"{os.getcwd()}/{turb_file}"'
-                inflow_file["Filename_BTS"] = f'"{os.getcwd()}/{turb_file}"'
+                inflow_file["Filename"] = f'"{os.getcwd()}/{wind_file}"'
+                inflow_file["Filename_BTS"] = f'"{os.getcwd()}/{wind_file}"'
 
-            elif turb_file.endswith("wnd"):
+            elif wind_file.endswith("wnd"):
                 # Set wind input to TurbSim.
                 inflow_file["WindType"] = 4
 
                 inflow_file["FilenameRoot"] = (
-                    f'"{os.getcwd()}/{turb_file.removesuffix(".wnd")}"'
+                    f'"{os.getcwd()}/{wind_file.removesuffix(".wnd")}"'
                 )
 
             else:
-                raise ValueError("Unknown wind file. Use '.bts' or '.wnd'.")
+                raise ValueError("Unknown wind file. Use '.bts', '.wnd' or '.hh'.")
 
             # Write inflow file.
-            path = f"{os.getcwd()}/{output_dir}/{Path(turb_file).stem}.dat"
+            path = f"{os.getcwd()}/{output_dir}/{Path(wind_file).stem}.dat"
             inflow_file.write(path)
             inflow_files.append(path)
+
+    ################################################################################################
+    # Find initial turbine state.
+    if initialize_turbine_state:
+        if custom_initial_state is not None:
+            init_state = pl.read_csv(custom_initial_state)
+        else:
+            if os.path.isfile(model_dir / "simdriver_initial_state.csv"):
+                init_state = pl.read_csv(model_dir / "simdriver_initial_state.csv")
+            else:
+                print("running simulation to find initial turbine state ...\n")
+                init_state = initial_state.initial_state(
+                    input_file,
+                    time_step,
+                    fast_version,
+                    custom_fast,
+                    verbose,
+                    **initialization_options,
+                )
+                print("finished simulation to find initial turbine state.\n")
 
     ################################################################################################
     # Run FAST in parallel.
@@ -242,7 +283,8 @@ def run_fast(
             # ElastoDyn.
             elastodyn_file = FASTInputFile(fst_file["EDFile"].strip('"'))
             if initialize_turbine_state:
-                pass
+                print(init_state)
+                return
             else:
                 # Set initial rotor speed to zero,
                 # because this option is normally used by the initial_state function.
