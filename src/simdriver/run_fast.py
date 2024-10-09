@@ -7,7 +7,11 @@ import math
 from shutil import copytree, rmtree
 import polars as pl
 from polars import col
+import numpy as np
 from weio import FASTInputFile, FASTOutputFile
+from weio.turbsim_file import TurbSimFile
+from weio.fast_wind_file import FASTWndFile
+from weio.fast_summary_file import FASTSummaryFile
 
 from . import initial_state
 
@@ -150,7 +154,7 @@ def run_fast(
             id = f"U_{float(u):05.2f}".replace(".", "d")
             path = f"{os.getcwd()}/{output_dir}/{id}.dat"
             inflow_file.write(path)
-            inflow_files.append(path)
+            inflow_files.append((path, u))
 
     # Non-steady wind input.
     else:
@@ -170,38 +174,66 @@ def run_fast(
             wind_files_list = wind_files
 
         # Loop over wind input files.
-        for wind_file in wind_files_list:
-            if wind_file.endswith("hh"):
+        for wind_file_path in wind_files_list:
+            if wind_file_path.endswith("hh"):
                 # Set wind input to uniform wind.
                 inflow_file["WindType"] = 2
 
-                inflow_file["FileName_Uni"] = f'"{os.getcwd()}/{wind_file}"'
+                inflow_file["FileName_Uni"] = f'"{os.getcwd()}/{wind_file_path}"'
                 inflow_file["RefHt_Uni"] = reference_height
                 inflow_file["RefLength"] = rotor_diameter
 
-            elif wind_file.endswith("bts"):
+                # Get initial wind speed.
+                if initialize_turbine_state:
+                    wind_file = FASTWndFile(wind_file_path).toDataFrame()
+                    v0_init = wind_file["WindSpeed_[m/s]"][0]
+
+            elif wind_file_path.endswith("bts"):
                 # Set wind input to TurbSim.
                 inflow_file["WindType"] = 3
 
                 # Try both for compatibility with older versions.
-                inflow_file["Filename"] = f'"{os.getcwd()}/{wind_file}"'
-                inflow_file["Filename_BTS"] = f'"{os.getcwd()}/{wind_file}"'
+                inflow_file["Filename"] = f'"{os.getcwd()}/{wind_file_path}"'
+                inflow_file["Filename_BTS"] = f'"{os.getcwd()}/{wind_file_path}"'
 
-            elif wind_file.endswith("wnd"):
+                # Get initial wind speed.
+                if initialize_turbine_state:
+                    _, v0_init, _ = TurbSimFile(wind_file_path).hubValues()
+
+            elif wind_file_path.endswith("wnd"):
                 # Set wind input to TurbSim.
                 inflow_file["WindType"] = 4
 
                 inflow_file["FilenameRoot"] = (
-                    f'"{os.getcwd()}/{wind_file.removesuffix(".wnd")}"'
+                    f'"{os.getcwd()}/{wind_file_path.removesuffix(".wnd")}"'
                 )
+
+                # Get initial wind speed.
+                if initialize_turbine_state:
+                    ref_speed_line = (
+                        open(wind_file_path.removesuffix(".wnd") + ".sum")
+                        .readlines()[43]
+                        .split()
+                    )
+                    assert ref_speed_line[1:] == [
+                        "Reference",
+                        "wind",
+                        "speed",
+                        "[m/s]",
+                    ]
+                    v0_init = float(ref_speed_line[0])
 
             else:
                 raise ValueError("Unknown wind file. Use '.bts', '.wnd' or '.hh'.")
 
             # Write inflow file.
-            path = f"{os.getcwd()}/{output_dir}/{Path(wind_file).stem}.dat"
+            path = f"{os.getcwd()}/{output_dir}/{Path(wind_file_path).stem}.dat"
             inflow_file.write(path)
-            inflow_files.append(path)
+
+            if not initialize_turbine_state:
+                v0_init = None
+
+            inflow_files.append((path, v0_init))
 
     ################################################################################################
     # Find initial turbine state.
@@ -236,7 +268,7 @@ def run_fast(
         # Iterate over batch and process it in parallel.
         temp_dirs = []
         fst_files = []
-        for inflow_file in batch:
+        for inflow_file, v0_init in batch:
             print(f"preparing {Path(inflow_file).stem} ...")
             # Prepare temporary working directory.
             temp_dir = f"{os.getcwd()}/{output_dir}/temp_{Path(inflow_file).stem}"
@@ -279,16 +311,34 @@ def run_fast(
                 except Exception:
                     pass
 
-            # Set output parameters.
-            # ElastoDyn.
+            # Set initial turbine state.
             elastodyn_file = FASTInputFile(fst_file["EDFile"].strip('"'))
             if initialize_turbine_state:
-                print(init_state)
-                return
+                elastodyn_file["OoPDefl"] = np.interp(
+                    v0_init, init_state["v0"], init_state["OoPDefl"]
+                )
+                elastodyn_file["IPDefl"] = np.interp(
+                    v0_init, init_state["v0"], init_state["IPDefl"]
+                )
+                pitch = np.interp(v0_init, init_state["v0"], init_state["pitch"])
+                elastodyn_file["BlPitch(1)"] = pitch
+                elastodyn_file["BlPitch(2)"] = pitch
+                elastodyn_file["BlPitch(3)"] = pitch
+                elastodyn_file["RotSpeed"] = np.interp(
+                    v0_init, init_state["v0"], init_state["rot_speed"]
+                )
+                elastodyn_file["TTDspFA"] = np.interp(
+                    v0_init, init_state["v0"], init_state["TTDspFA"]
+                )
+                elastodyn_file["TTDspSS"] = np.interp(
+                    v0_init, init_state["v0"], init_state["TTDspSS"]
+                )
             else:
-                # Set initial rotor speed to zero,
-                # because this option is normally used by the initial_state function.
+                # Set initial rotor speed to zero as a default value.
                 elastodyn_file["RotSpeed"] = 0
+
+            # Set output parameters.
+            # ElastoDyn.
             elastodyn_file["OutList"] = [""] + DEFAULT_ELASTODYN_OUT + elastodyn_out
             elastodyn_file.write(fst_file["EDFile"].strip('"'))
 
@@ -351,7 +401,7 @@ def run_fast(
     # Process output.
     print("processing output ...")
     failures = []
-    for inflow_file in inflow_files:
+    for inflow_file, _ in inflow_files:
         try:
             # Load FAST output file.
             output_file = FASTOutputFile(f"{output_dir}/{Path(inflow_file).stem}.outb")

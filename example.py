@@ -13,7 +13,6 @@ simdriver.run_fast(
     time_span=SIM_TIME,
     time_step=0.01,
 )
-exit()
 
 # Generate turbulent wind fields.
 simdriver.run_turbsim(

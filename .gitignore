@@ -3,3 +3,4 @@ data/
 .env/
 build/
 *.egg-info/
+extern/NREL_5MW/simdriver_initial_state.csv

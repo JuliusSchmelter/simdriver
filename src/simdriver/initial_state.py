@@ -91,10 +91,13 @@ def initial_state(
         }
     )
 
+    # Clean up in case previous runs were aborted.
     try:
-        os.mkdir("simdriver_temp")
+        rmtree("simdriver_temp")
     except Exception:
         pass
+
+    os.mkdir("simdriver_temp")
 
     wnd_file_path = "simdriver_temp/step_wind.hh"
 
