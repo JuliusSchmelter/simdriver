@@ -21,10 +21,12 @@ def initial_state(
     min_speed: float = 3,
     max_speed: float = 25,
     step_size: float = 2,
-    rise_time: float = 20,
-    time_at_speed: float = 80,
+    startup_time: float = 300,
+    rise_time: float = 30,
+    time_at_speed: float = 120,
     analyzed_fraction: float = 0.25,
     wind_time_step: float = 0.1,
+    retain_temp_files: bool = False,
 ):
     """
     Run OpenFAST to find initial turbine state for different wind speeds.
@@ -51,27 +53,47 @@ def initial_state(
     time = [0]
     speed = [0]
     windows = []
+    startup = True
     for wind_step in wind_steps:
         v_0 = speed[-1]
         v = speed[-1]
         t = time[-1]
-        windows.append(
-            {
-                "v0": wind_step,
-                "start": t + rise_time + time_at_speed * (1 - analyzed_fraction),
-                "end": t + rise_time + time_at_speed,
-            }
-        )
+
+        # Startup.
+        if startup:
+            windows.append(
+                {
+                    "v0": wind_step,
+                    "start": startup_time + time_at_speed * (1 - analyzed_fraction),
+                    "end": startup_time + time_at_speed,
+                }
+            )
+
+            for _ in range(round(startup_time / wind_time_step)):
+                t += wind_time_step
+                time.append(t)
+                speed.append(wind_step)
+
+            startup = False
 
         # Linear rise.
-        for i in range(round(rise_time / wind_time_step)):
-            t += wind_time_step
-            v += ((wind_step - v_0) / rise_time) * wind_time_step
-            time.append(t)
-            speed.append(v)
+        else:
+            windows.append(
+                {
+                    "v0": wind_step,
+                    "start": t + rise_time + time_at_speed * (1 - analyzed_fraction),
+                    "end": t + rise_time + time_at_speed,
+                }
+            )
+
+            for _ in range(round(rise_time / wind_time_step)):
+                t += wind_time_step
+                v += ((wind_step - v_0) / rise_time) * wind_time_step
+                time.append(t)
+                speed.append(v)
 
         # Constant speed.
-        for i in range(round(time_at_speed / wind_time_step)):
+        for _ in range(round(time_at_speed / wind_time_step)):
             t += wind_time_step
             time.append(t)
             speed.append(wind_step)
@@ -154,12 +176,13 @@ def initial_state(
     initial_states.write_csv(initial_state_output)
 
     # Clean up.
-    # Ugly hack, I don't know why this is necessary.
-    for _ in range(10):
-        try:
-            rmtree("simdriver_temp", ignore_errors=True)
-            Path("simdriver_temp").rmdir()
-        except Exception:
-            pass
+    if not retain_temp_files:
+        # Ugly hack, I don't know why this is necessary.
+        for _ in range(10):
+            try:
+                rmtree("simdriver_temp", ignore_errors=True)
+                Path("simdriver_temp").rmdir()
+            except Exception:
+                pass
 
     return initial_states

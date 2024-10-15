@@ -6,12 +6,10 @@ from itertools import batched
 import math
 from shutil import copytree, rmtree
 import polars as pl
-from polars import col
 import numpy as np
 from weio import FASTInputFile, FASTOutputFile
 from weio.turbsim_file import TurbSimFile
 from weio.fast_wind_file import FASTWndFile
-from weio.fast_summary_file import FASTSummaryFile
 
 from . import initial_state
 
@@ -334,8 +332,8 @@ def run_fast(
                     v0_init, init_state["v0"], init_state["TTDspSS"]
                 )
             else:
-                # Set initial rotor speed to zero as a default value.
-                elastodyn_file["RotSpeed"] = 0
+                # Set initial rotor speed to 5 rpm as a default assumption.
+                elastodyn_file["RotSpeed"] = 5
 
             # Set output parameters.
             # ElastoDyn.
